@@ -1563,6 +1563,12 @@ az_parse_file(struct auth_zone* z, FILE* in, uint8_t* rr, size_t rrbuflen,
 	return 1;
 }
 
+static int64_t timespec_diffmsec(const struct timespec* tv2, const struct timespec* tv1) {
+	int64_t delta = tv2->tv_sec - tv1->tv_sec;
+	delta = delta * 1000 + (tv2->tv_nsec - tv1->tv_nsec) / 1000000;
+	return delta > 0 ? delta : 1;
+}
+
 int
 auth_zone_read_zonefile(struct auth_zone* z, struct config_file* cfg)
 {
@@ -1613,6 +1619,8 @@ auth_zone_read_zonefile(struct auth_zone* z, struct config_file* cfg)
 		memcpy(state.origin, z->name, z->namelen);
 		state.origin_len = z->namelen;
 	}
+	struct timespec start;
+	clock_gettime(CLOCK_MONOTONIC, &start);
 	/* parse the (toplevel) file */
 	if(!az_parse_file(z, in, rr, sizeof(rr), &state, zfilename, 0, cfg)) {
 		char* n = sldns_wire2str_dname(z->name, z->namelen);
@@ -1622,6 +1630,12 @@ auth_zone_read_zonefile(struct auth_zone* z, struct config_file* cfg)
 		fclose(in);
 		return 0;
 	}
+	struct timespec end;
+	clock_gettime(CLOCK_MONOTONIC, &end);
+	long ms = timespec_diffmsec(&end, &start);
+	char nm[255+1];
+	dname_str(z->name, nm);
+	log_err("XXX: read zonefile %s for %s (took %ldms)", zfilename, nm, ms);
 	fclose(in);
 
 	if(z->rpz)

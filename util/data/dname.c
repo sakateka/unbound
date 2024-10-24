@@ -468,14 +468,43 @@ dname_count_size_labels(uint8_t* dname, size_t* size)
  * @return: 0, -1, +1 comparison result.
  */
 static int
-memlowercmp(uint8_t* p1, uint8_t* p2, uint8_t len)
+memlowercmp(register uint8_t* p1, register uint8_t* p2, uint8_t len)
 {
-	while(len--) {
-		if(*p1 != *p2 && tolower((unsigned char)*p1) != tolower((unsigned char)*p2)) {
-			if(tolower((unsigned char)*p1) < tolower((unsigned char)*p2))
-				return -1;
+	int c;
+	while(len >= 8) {
+		int64_t a = (int64_t)(sldns_read_uint64(p1) & ~0x2020202020202020);
+		int64_t b = (int64_t)(sldns_read_uint64(p2) & ~0x2020202020202020);
+		if (a > b)
 			return 1;
-		}
+		else if (b > a)
+			return -1;
+		len -= 8;
+		p1+=8;
+		p2+=8;
+	}
+	while(len >= 4) {
+		int32_t a = (int32_t)(sldns_read_uint32(p1) & ~0x20202020);
+		int32_t b = (int32_t)(sldns_read_uint32(p2) & ~0x20202020);
+		if((c=(a-b)) != 0)
+			return c;
+		len -= 4;
+		p1+=4;
+		p2+=4;
+	}
+	while(len >= 2) {
+		int16_t a = (int16_t)(sldns_read_uint16(p1) & ~0x2020);
+		int16_t b = (int16_t)(sldns_read_uint16(p2) & ~0x2020);
+		if((c=(a-b)) != 0)
+			return c;
+		len -= 2;
+		p1+=2;
+		p2+=2;
+	}
+
+	while(len--) {
+	c = (int)(*p1 & ~0x20) - (int)(*p2 & ~0x20);
+		if(c != 0)
+			return c;
 		p1++;
 		p2++;
 	}
@@ -783,23 +812,19 @@ dname_is_wild(uint8_t* dname)
  * @return: 0, -1, +1 comparison result.
  */
 static int
-memcanoncmp(uint8_t* p1, uint8_t len1, uint8_t* p2, uint8_t len2)
+memcanoncmp(register uint8_t* p1, uint8_t len1, register uint8_t* p2, uint8_t len2)
 {
 	uint8_t min = (len1<len2)?len1:len2;
 	int c = memlowercmp(p1, p2, min);
 	if(c != 0)
 		return c;
 	/* equal, see who is shortest */
-	if(len1 < len2)
-		return -1;
-	if(len1 > len2)
-		return 1;
-	return 0;
+	return (int)len1 - (int)len2;
 }
 
 
 int 
-dname_canon_lab_cmp(uint8_t* d1, int labs1, uint8_t* d2, int labs2, int* mlabs)
+dname_canon_lab_cmp(register uint8_t* d1, int labs1, register uint8_t* d2, int labs2, int* mlabs)
 {
 	/* like dname_lab_cmp, but with different label comparison,
 	 * empty character sorts before \000.
