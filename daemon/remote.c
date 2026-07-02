@@ -1,7 +1,6 @@
 /*
  * daemon/remote.c - remote control for the unbound daemon.
  *
- * Copyright (c) 2024, Rubicon Communications, LLC ("Netgate"). All rights reserved.
  * Copyright (c) 2008, NLnet Labs. All rights reserved.
  *
  * This software is open source.
@@ -1539,12 +1538,13 @@ perform_data_remove_rr(RES* ssl, struct local_zones* local_zones,
 	uint8_t* rr, size_t len, size_t dname_len, char *arg)
 {
 	uint16_t rr_class, rr_type;
-	int labs, s;
+	int labs;
 	struct local_zone* z;
 	struct local_data* ld;
 	uint8_t *rdata;
 	size_t rdata_len, index;
 	struct packed_rrset_data* d;
+	struct local_rrset* p;
 
 	rdata = sldns_wirerr_get_rdatawl(rr, len, dname_len);
 	rdata_len = ((size_t)sldns_wirerr_get_rdatalen(rr, len, dname_len))+2;
@@ -1555,7 +1555,7 @@ perform_data_remove_rr(RES* ssl, struct local_zones* local_zones,
 	rr_type = sldns_wirerr_get_type(rr, len, dname_len);
 
 	z = local_zones_lookup(local_zones, rr, dname_len,
-			labs, rr_class, rr_type);
+			labs, rr_class, rr_type, 1);
 	if (!z) {
 		ssl_printf(ssl, "error no zone for rr %s\n", arg);
 		return 0;
@@ -1567,16 +1567,15 @@ perform_data_remove_rr(RES* ssl, struct local_zones* local_zones,
 		return 0;
 	}
 
-	struct local_rrset* prev=NULL, *p=ld->rrsets;
+	p = ld->rrsets;
 	while (p && ntohs(p->rrset->rk.type) != rr_type) {
-		prev = p;
 		p = p->next;
 	}
 
 	if (!p) {
 		ssl_printf(ssl, "error no rrset for rr %s\n", arg);
 		return 0;
-    }
+	}
 
 	d = (struct packed_rrset_data*)p->rrset->entry.data;
 	if (!packed_rrset_find_rr(d, rdata, rdata_len, &index)) {

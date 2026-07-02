@@ -1,3 +1,7 @@
+2 July 2026: Wouter
+	- Merge #1087: Overload `local_data_remove` to support removing
+	  specific records.
+
 30 June 2026: Wouter
 	- Fix #1469: dohclient: DoH POST missing content-length → :status
 	  400 from strict resolvers (Cloudflare, Mullvad).
